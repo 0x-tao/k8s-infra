@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: clone-bitbucket-
+spec:
+  entrypoint: git-clone
+  templates:
+  - name: git-clone
+    container:
+      image: alpine/git:latest
+      command: [sh, -c]
+      args:
+        - |
+          echo ">>> Setting up SSH"
+          mkdir -p /root/.ssh
+          cp /ssh/id_rsa /root/.ssh/id_rsa
+          cp /ssh/known_hosts /root/.ssh/known_hosts
+          chmod 600 /root/.ssh/id_rsa
+
+          echo ">>> Cloning repo"
+          git clone -b dev git@bitbucket.org:iMOTIF/moji.git /src
+
+          echo ">>> List files"
+          ls -la /src
+      volumeMounts:
+        - name: ssh-key
+          mountPath: /ssh
+          readOnly: true
+    volumes:
+      - name: ssh-key
+        secret:
+          secretName: git-ssh-key
+

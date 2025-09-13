@@ -7,7 +7,7 @@ spec:
   arguments:
     parameters:
       - name: repo
-        value: https://github.com/tao-thewarat/MOJI.git
+        value: git@bitbucket.org:iMOTIF/moji.git
       - name: branch
         value: dev
       - name: image
@@ -26,6 +26,9 @@ spec:
     - name: docker-config
       secret:
         secretName: docker-config
+    - name: ssh-key
+      secret:
+        secretName: git-ssh-key
 
   templates:
     - name: main-steps
@@ -53,20 +56,25 @@ spec:
           - name: repo
           - name: branch
       container:
-        image: alpine/git:v2.26.2
+        image: alpine/git:latest
+        command: [sh, -c]
+        args:
+          - |
+            echo ">>> Setting up SSH"
+            mkdir -p /root/.ssh
+            cp /ssh/id_rsa /root/.ssh/id_rsa
+            cp /ssh/known_hosts /root/.ssh/known_hosts
+            chmod 600 /root/.ssh/id_rsa
+
+            echo ">>> Cloning repo"
+            git clone --depth 1 --branch {{inputs.parameters.branch}} --single-branch {{inputs.parameters.repo}} .
         volumeMounts:
           - mountPath: /work
             name: work
+          - mountPath: /ssh
+            name: ssh-key
+            readOnly: true
         workingDir: /work
-        args:
-          - clone
-          - --depth
-          - "1"
-          - --branch
-          - "{{inputs.parameters.branch}}"
-          - --single-branch
-          - "{{inputs.parameters.repo}}"
-          - .
 
     - name: build
       inputs:

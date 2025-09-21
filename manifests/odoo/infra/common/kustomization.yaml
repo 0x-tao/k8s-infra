@@ -1,0 +1,2 @@
+resources:
+  - storageclass-microk8s-retain.yaml

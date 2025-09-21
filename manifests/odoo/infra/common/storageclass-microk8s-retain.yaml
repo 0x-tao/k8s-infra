@@ -1,17 +1,7 @@
-apiVersion: argoproj.io/v1alpha1
-kind: Application
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
 metadata:
-  name: infra-common
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: 'https://github.com/tao-thewarat/k8s-infra.git'
-    targetRevision: HEAD
-    path: manifests/odoo/infra/common
-  destination:
-    server: https://kubernetes.default.svc
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+  name: microk8s-retain
+provisioner: microk8s.io/hostpath
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer

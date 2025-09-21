@@ -22,65 +22,22 @@ spec:
                 generateName: pr-check-
                 namespace: argo
               spec:
-                entrypoint: main-steps
+                entrypoint: debug
                 arguments:
                   parameters:
-                    - name: repo
-                      value: git@bitbucket.org:iMOTIF/moji.git
-                    - name: branch
-                      value: dev
-                volumeClaimTemplates:
-                  - metadata:
-                      name: work
-                    spec:
-                      accessModes: ["ReadWriteOnce"]
-                      resources:
-                        requests:
-                          storage: 5Gi
-                volumes:
-                  - name: ssh-key
-                    secret:
-                      secretName: git-ssh-key
-
+                    - name: message
+                      value: "default-repo"
                 templates:
-                  - name: main-steps
-                    steps:
-                      - - name: clone
-                          template: clone
-                          arguments:
-                            parameters:
-                              - name: repo
-                                value: "{{workflow.parameters.repo}}"
-                              - name: branch
-                                value: "{{workflow.parameters.branch}}"
-
-                  - name: clone
+                  - name: debug
                     inputs:
                       parameters:
-                        - name: repo
-                        - name: branch
+                        - name: message
                     container:
-                      image: alpine/git:latest
-                      command: [sh, -c]
-                      args:
-                        - |
-                          echo ">>> Setting up SSH"
-                          mkdir -p /root/.ssh
-                          cp /ssh/id_rsa /root/.ssh/id_rsa
-                          cp /ssh/known_hosts /root/.ssh/known_hosts
-                          chmod 600 /root/.ssh/id_rsa
-
-                          echo "-------------------------------------------"
-                          echo "Branch: {{inputs.parameters.branch}}"
-                          echo "Repo: {{inputs.parameters.repo}}"
-                          echo "-------------------------------------------"
-
-                          echo ">>> Cloning repo"
-                          git clone --depth 1 --branch "{{inputs.parameters.branch}}" --single-branch "{{inputs.parameters.repo}}" .
-                      volumeMounts:
-                        - mountPath: /work
-                          name: work
-                        - mountPath: /ssh
-                          name: ssh-key
-                          readOnly: true
-                      workingDir: /work
+                      image: docker/whalesay:latest
+                      command: [cowsay]
+                      args: ["{{inputs.parameters.message}}"]
+      parameters:
+        - src:
+            dependencyName: bitbucket-dep
+            dataKey: body.message
+          dest: spec.arguments.parameters.0.value

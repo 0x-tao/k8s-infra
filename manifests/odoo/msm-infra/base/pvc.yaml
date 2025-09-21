@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: db-data
-  namespace: odoo-moji
+  namespace: odoo-msm
   annotations:
     argocd.argoproj.io/sync-options: Prune=false
 spec:
@@ -17,7 +17,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: odoo-data
-  namespace: odoo-moji
+  namespace: odoo-msm
   annotations:
     argocd.argoproj.io/sync-options: Prune=false
 spec:
@@ -32,7 +32,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: odoo-addons
-  namespace: odoo-moji
+  namespace: odoo-msm
   annotations:
     argocd.argoproj.io/sync-options: Prune=false
 spec:
@@ -42,4 +42,3 @@ spec:
   resources:
     requests:
       storage: 5Gi
-

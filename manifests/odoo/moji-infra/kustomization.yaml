@@ -5,5 +5,4 @@ resources:
   - base/postgres-service.yaml
   - base/odoo-deployment.yaml
   - base/odoo-service.yaml
-  - base/sc-microk8s.yaml
 

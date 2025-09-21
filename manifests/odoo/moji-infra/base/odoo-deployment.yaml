@@ -21,7 +21,7 @@ spec:
         command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]
         env:
         - name: HOST
-          value: postgres
+          value: db
         - name: PORT
           value: "5432"
         - name: USER

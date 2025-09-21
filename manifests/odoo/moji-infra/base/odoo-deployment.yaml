@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: odoo
-        image: imotifdocker/odoo-moji:prod
+        image: imotifdocker/odoo-moji:prod-21
         ports:
         - containerPort: 8069
         command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]
@@ -42,4 +42,3 @@ spec:
       - name: odoo-addons
         persistentVolumeClaim:
           claimName: odoo-addons
-

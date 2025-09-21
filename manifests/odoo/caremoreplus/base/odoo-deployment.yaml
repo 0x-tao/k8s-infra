@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: odoo
+  namespace: odoo-caremoreplus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: odoo
+  template:
+    metadata:
+      labels:
+        app: odoo
+    spec:
+      containers:
+      - name: odoo
+        image: imotifdocker/odoo-caremoreplus:dev
+        ports:
+        - containerPort: 8069
+        command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]
+        env:
+        - name: HOST
+          value: postgres
+        - name: PORT
+          value: "5432"
+        - name: USER
+          value: odoo
+        - name: PASSWORD
+          value: odoo
+        - name: DATABASE
+          value: postgres
+        volumeMounts:
+        - name: odoo-data
+          mountPath: /var/lib/odoo
+        - name: odoo-addons
+          mountPath: /mnt/extra-addons
+      volumes:
+      - name: odoo-data
+        persistentVolumeClaim:
+          claimName: odoo-data
+      - name: odoo-addons
+        persistentVolumeClaim:
+          claimName: odoo-addons

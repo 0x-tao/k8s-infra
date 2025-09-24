@@ -27,7 +27,7 @@ spec:
         - name: USER
           value: odoo
         - name: PASSWORD
-          value: odoo18@2024
+          value: odoo
         - name: DATABASE
           value: postgres
         volumeMounts:

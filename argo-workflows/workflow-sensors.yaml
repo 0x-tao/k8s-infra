@@ -13,8 +13,8 @@ spec:
   triggers:
     - template:
         name: webhook-workflow-trigger
-        argoWorkflow:
-          operation: submit
+        k8s:
+          operation: create
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -23,23 +23,23 @@ spec:
                 generateName: webhook-
                 namespace: argo
               spec:
-                entrypoint: print-message
+                entrypoint: whalesay
                 arguments:
                   parameters:
                   - name: message
-                    value: "hello world"   # จะถูก override จาก payload
+                    value: hello world
                 templates:
-                - name: print-message
+                - name: whalesay
                   inputs:
                     parameters:
                     - name: message
                   container:
-                    image: busybox
-                    command: [echo]
+                    image: docker/whalesay:latest
+                    command: [cowsay]
                     args: ["{{inputs.parameters.message}}"]
-      parameters:
-        - src:
-            dependencyName: test-dep
-            dataKey: body.message
-          dest: spec.arguments.parameters.0.value
+          parameters:
+            - src:
+                dependencyName: test-dep
+                dataKey: body
+              dest: spec.arguments.parameters.0.value
 

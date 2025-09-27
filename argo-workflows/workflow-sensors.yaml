@@ -7,7 +7,7 @@ spec:
   template:
     serviceAccountName: operate-workflow-sa
   dependencies:
-    - name: test-dep
+    - name: bitbucket-dep
       eventSourceName: webhook
       eventName: example
   triggers:
@@ -23,23 +23,133 @@ spec:
                 generateName: webhook-
                 namespace: argo
               spec:
-                entrypoint: whalesay
+                entrypoint: main
                 arguments:
                   parameters:
-                  - name: message
-                    value: hello world
+                    - name: branch
+                      value: default-branch
+                    - name: repo
+                      value: default-repo
+                    - name: commit
+                      value: c21ac1dfc43b # 👈 commit id
+                volumeClaimTemplates:
+                  - metadata:
+                      name: work
+                    spec:
+                      accessModes: ["ReadWriteOnce"]
+                      resources:
+                        requests:
+                          storage: 5Gi
                 templates:
-                - name: whalesay
-                  inputs:
-                    parameters:
-                    - name: message
-                  container:
-                    image: docker/whalesay:latest
-                    command: [cowsay]
-                    args: ["{{inputs.parameters.message}}"]
+                  - name: main
+                    steps:
+                      - - name: git-clone
+                          template: git-clone
+                          arguments:
+                            parameters:
+                              - name: branch
+                                value: "{{workflow.parameters.branch}}"
+                              - name: repo
+                                value: "{{workflow.parameters.repo}}"
+                      - - name: changed-files
+                          template: get-changed-files
+                          arguments:
+                            parameters:
+                              - name: commit
+                                value: "{{workflow.parameters.commit}}"
+                      - - name: pre-commit
+                          template: pre-commit
+                          arguments:
+                            parameters:
+                              - name: files
+                                value: "/work/changed_files.txt"
+
+                  - name: git-clone
+                    inputs:
+                      parameters:
+                        - name: branch
+                        - name: repo
+                    container:
+                      image: alpine/git:latest
+                      workingDir: /work
+                      command: [sh, -c]
+                      args:
+                        - |
+                          echo ">>> Setting up SSH"
+                          mkdir -p ~/.ssh
+                          cp /ssh/id_rsa ~/.ssh/id_rsa
+                          cp /ssh/known_hosts ~/.ssh/known_hosts
+                          chmod 600 ~/.ssh/id_rsa
+
+                          echo ">>> Cloning repo"
+                          git clone --depth 1 --branch {{inputs.parameters.branch}} \
+                            --single-branch git@bitbucket.org:{{inputs.parameters.repo}}.git .
+                      volumeMounts:
+                        - name: work
+                          mountPath: /work
+                        - name: ssh-key
+                          mountPath: /ssh
+                          readOnly: true
+
+                  - name: get-changed-files
+                    inputs:
+                      parameters:
+                        - name: commit
+                    container:
+                      image: alpine:3.18
+                      workingDir: /work
+                      command: [sh, -c]
+                      args:
+                        - |
+                          echo ">>> Installing curl and jq"
+                          apk add --no-cache curl jq
+
+                          echo ">>> Calling Bitbucket API"
+                          curl --request GET \
+                            --url "https://api.bitbucket.org/2.0/repositories/iMOTIF/odoo-icore/diffstat/{{inputs.parameters.commit}}" \
+                             -u "${BITBUCKET_USERNAME}:${BITBUCKET_TOKEN}" \
+                            --header "Accept: application/json" \
+                          | jq -r '.values[].new?.path // .values[].old?.path' > /work/changed_files.txt
+
+                          echo ">>> Files changed:"
+                          cat /work/changed_files.txt
+                      volumeMounts:
+                        - name: work
+                          mountPath: /work
+
+                  - name: pre-commit
+                    inputs:
+                      parameters:
+                        - name: files
+                    script:
+                      image: python:3.11-slim
+                      workingDir: /work
+                      command: [sh]
+                      source: |
+                        set -e
+                        apt-get update && apt-get install -y git
+                        pip install pre-commit
+                        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+                        ls -a
+                        cat changed_files.txt | xargs pre-commit run --files
+                        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+                      volumeMounts:
+                        - name: work
+                          mountPath: /work
+                volumes:
+                  - name: ssh-key
+                    secret:
+                      secretName: git-ssh-key
           parameters:
             - src:
-                dependencyName: test-dep
-                dataKey: body
+                dependencyName: bitbucket-dep
+                dataKey: body.pullrequest.source.branch.name
               dest: spec.arguments.parameters.0.value
-
+            - src:
+                dependencyName: bitbucket-dep
+                dataKey: body.repository.full_name
+              dest: spec.arguments.parameters.1.value
+            - src:
+                dependencyName: bitbucket-dep
+                dataKey: body.pullrequest.source.commit.hash
+              dest: spec.arguments.parameters.2.value

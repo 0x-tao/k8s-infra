@@ -31,7 +31,8 @@ spec:
                     - name: repo
                       value: default-repo
                     - name: commit
-                      value: c21ac1dfc43b # 👈 commit id
+                      value: default-commit
+
                 volumeClaimTemplates:
                   - metadata:
                       name: work
@@ -40,9 +41,46 @@ spec:
                       resources:
                         requests:
                           storage: 5Gi
+
                 templates:
                   - name: main
                     steps:
+                      # 2. Set status inprogress ของทั้ง pre-commit + unit-test พร้อมกัน
+                      - - name: set-status-inprogress-pre-commit
+                          template: set-status
+                          arguments:
+                            parameters:
+                              - name: commit
+                                value: "{{workflow.parameters.commit}}"
+                              - name: state
+                                value: "INPROGRESS"
+                              - name: repo
+                                value: "{{workflow.parameters.repo}}"
+                              - name: branch
+                                value: "{{workflow.parameters.branch}}"
+                              - name: key
+                                value: "pre-commit"
+                              - name: description
+                                value: "pre-commit"
+
+                        - name: set-status-inprogress-unittest
+                          template: set-status
+                          arguments:
+                            parameters:
+                              - name: commit
+                                value: "{{workflow.parameters.commit}}"
+                              - name: state
+                                value: "INPROGRESS"
+                              - name: repo
+                                value: "{{workflow.parameters.repo}}"
+                              - name: branch
+                                value: "{{workflow.parameters.branch}}"
+                              - name: key
+                                value: "unit-test"
+                              - name: description
+                                value: "unit-test"
+
+                      # 1. Clone ก่อน (รันเดี่ยว)
                       - - name: git-clone
                           template: git-clone
                           arguments:
@@ -51,12 +89,18 @@ spec:
                                 value: "{{workflow.parameters.branch}}"
                               - name: repo
                                 value: "{{workflow.parameters.repo}}"
+
+                      # 3. หาไฟล์ที่เปลี่ยน (รันเดี่ยว)
                       - - name: changed-files
                           template: get-changed-files
                           arguments:
                             parameters:
                               - name: commit
                                 value: "{{workflow.parameters.commit}}"
+                              - name: repo
+                                value: "{{workflow.parameters.repo}}"
+
+                      # 4. รัน pre-commit (เดี่ยว)
                       - - name: pre-commit
                           template: pre-commit
                           arguments:
@@ -64,6 +108,45 @@ spec:
                               - name: files
                                 value: "/work/changed_files.txt"
 
+                      # 5. update status ของ pre-commit
+                      - - name: set-status-success
+                          template: set-status
+                          when: "{{steps.pre-commit.status}} == Succeeded"
+                          arguments:
+                            parameters:
+                              - name: commit
+                                value: "{{workflow.parameters.commit}}"
+                              - name: state
+                                value: "SUCCESSFUL"
+                              - name: repo
+                                value: "{{workflow.parameters.repo}}"
+                              - name: branch
+                                value: "{{workflow.parameters.branch}}"
+                              - name: key
+                                value: "pre-commit"
+                              - name: description
+                                value: "pre-commit"
+
+                        - name: set-status-failed
+                          template: set-status
+                          when: "{{steps.pre-commit.status}} == Failed"
+                          arguments:
+                            parameters:
+                              - name: commit
+                                value: "{{workflow.parameters.commit}}"
+                              - name: state
+                                value: "FAILED"
+                              - name: repo
+                                value: "{{workflow.parameters.repo}}"
+                              - name: branch
+                                value: "{{workflow.parameters.branch}}"
+                              - name: key
+                                value: "pre-commit"
+                              - name: description
+                                value: "pre-commit"
+
+
+                  # --- Clone repo ---
                   - name: git-clone
                     inputs:
                       parameters:
@@ -91,10 +174,12 @@ spec:
                           mountPath: /ssh
                           readOnly: true
 
+                  # --- Get changed files ---
                   - name: get-changed-files
                     inputs:
                       parameters:
                         - name: commit
+                        - name: repo
                     container:
                       image: alpine:3.18
                       workingDir: /work
@@ -106,17 +191,21 @@ spec:
 
                           echo ">>> Calling Bitbucket API"
                           curl --request GET \
-                            --url "https://api.bitbucket.org/2.0/repositories/iMOTIF/odoo-icore/diffstat/{{inputs.parameters.commit}}" \
-                             -u "${BITBUCKET_USERNAME}:${BITBUCKET_TOKEN}" \
+                            --url "https://api.bitbucket.org/2.0/repositories/{{inputs.parameters.repo}}/diffstat/{{inputs.parameters.commit}}" \
+                            -u "${BITBUCKET_USERNAME}:${BITBUCKET_TOKEN}" \
                             --header "Accept: application/json" \
                           | jq -r '.values[].new?.path // .values[].old?.path' > /work/changed_files.txt
 
                           echo ">>> Files changed:"
                           cat /work/changed_files.txt
+                      envFrom:
+                        - secretRef:
+                            name: bitbucket-credentials
                       volumeMounts:
                         - name: work
                           mountPath: /work
 
+                  # --- Run pre-commit ---
                   - name: pre-commit
                     inputs:
                       parameters:
@@ -129,13 +218,43 @@ spec:
                         set -e
                         apt-get update && apt-get install -y git
                         pip install pre-commit
-                        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-                        ls -a
+                        echo ">>> Running pre-commit"
                         cat changed_files.txt | xargs pre-commit run --files
-                        echo ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
                       volumeMounts:
                         - name: work
                           mountPath: /work
+
+                  # --- Set commit status ---
+                  - name: set-status
+                    inputs:
+                      parameters:
+                        - name: commit
+                        - name: state
+                        - name: repo
+                        - name: branch
+                        - name: key
+                        - name: description
+                    container:
+                      image: curlimages/curl:8.9.1
+                      command: [sh, -c]
+                      args:
+                        - |
+                          echo ">>> Setting commit status to {{inputs.parameters.state}}"
+                          curl --request POST \
+                            --url "https://api.bitbucket.org/2.0/repositories/{{inputs.parameters.repo}}/commit/{{inputs.parameters.commit}}/statuses/build" \
+                            -u "${BITBUCKET_USERNAME}:${BITBUCKET_TOKEN}" \
+                            --header "Content-Type: application/json" \
+                            --data '{
+                              "key": "{{inputs.parameters.key}}",
+                              "state": "{{inputs.parameters.state}}",
+                              "description": "{{inputs.parameters.description}}",
+                              "url": "https://argo-workflows.imotif.io/workflows/argo/{{workflow.name}}?tab=workflow&uid={{workflow.uid}}",
+                              "refname": "{{inputs.parameters.branch}}"
+                            }'
+                      envFrom:
+                        - secretRef:
+                            name: bitbucket-credentials
+
                 volumes:
                   - name: ssh-key
                     secret:

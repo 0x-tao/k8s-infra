@@ -1,0 +1,8 @@
+resources:
+  - base/namespace.yaml
+  - base/pvc.yaml
+  - base/postgres-deployment.yaml
+  - base/postgres-service.yaml
+  - base/odoo-deployment.yaml
+  - base/odoo-service.yaml
+

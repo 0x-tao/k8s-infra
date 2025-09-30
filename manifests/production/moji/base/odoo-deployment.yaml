@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: odoo
-        image: imotifdocker/odoo-moji:prod-202509241400
+        image: imotifdocker/odoo-moji:prod-202509301626
         ports:
         - containerPort: 8069
         command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]

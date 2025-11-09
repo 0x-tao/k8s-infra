@@ -13,6 +13,8 @@ spec:
       labels:
         app: odoo
     spec:
+      imagePullSecrets:
+        - name: regcred 
       containers:
       - name: odoo
         image: imotifdocker/odoo-moji:prod-202511090158

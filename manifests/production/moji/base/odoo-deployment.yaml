@@ -22,6 +22,8 @@ spec:
         - containerPort: 8069
         command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]
         env:
+        - name: PROXY_MODE
+          value: "True"
         - name: HOST
           value: postgres
         - name: PORT

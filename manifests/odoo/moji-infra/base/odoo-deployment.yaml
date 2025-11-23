@@ -13,34 +13,34 @@ spec:
       labels:
         app: odoo
     spec:
-      containers:
       imagePullSecrets:
-        - name: regcred 
-      - name: odoo
-        image: imotifdocker/odoo-moji:202511231319
-        ports:
-        - containerPort: 8069
-        command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]
-        env:
-        - name: HOST
-          value: db
-        - name: PORT
-          value: "5432"
-        - name: USER
-          value: odoo
-        - name: PASSWORD
-          value: odoo
-        - name: DATABASE
-          value: postgres
-        volumeMounts:
-        - name: odoo-data
-          mountPath: /var/lib/odoo
-        - name: odoo-addons
-          mountPath: /mnt/extra-addons
+        - name: regcred
+      containers:
+        - name: odoo
+          image: imotifdocker/odoo-moji:202511231319
+          ports:
+            - containerPort: 8069
+          command: ["/usr/bin/odoo", "-c", "/etc/odoo/odoo.conf"]
+          env:
+            - name: HOST
+              value: db
+            - name: PORT
+              value: "5432"
+            - name: USER
+              value: odoo
+            - name: PASSWORD
+              value: odoo
+            - name: DATABASE
+              value: postgres
+          volumeMounts:
+            - name: odoo-data
+              mountPath: /var/lib/odoo
+            - name: odoo-addons
+              mountPath: /mnt/extra-addons
       volumes:
-      - name: odoo-data
-        persistentVolumeClaim:
-          claimName: odoo-data
-      - name: odoo-addons
-        persistentVolumeClaim:
-          claimName: odoo-addons
+        - name: odoo-data
+          persistentVolumeClaim:
+            claimName: odoo-data
+        - name: odoo-addons
+          persistentVolumeClaim:
+            claimName: odoo-addons
